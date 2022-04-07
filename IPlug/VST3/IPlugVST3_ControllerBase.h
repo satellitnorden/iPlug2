@@ -281,7 +281,7 @@ public:
       int64 color;
       if (pList->getInt(ChannelContext::kChannelColorKey, color) == kResultTrue)
       {
-        mChannelColor = (uint32) color;
+        mChannelColor = (uint32_t) color;
       }
 
       // get channel index namespace order of the current used index namespace
