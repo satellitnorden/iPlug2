@@ -283,29 +283,53 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
 
       information_text->SetAnimation([this](IControl *const RESTRICT control)
       {
-        switch (_CurrentLoadingState)
+        if (_Error != Error::NONE)
         {
-          case LoadingState::IDLE:
+          switch (_Error)
           {
-            static_cast<ITextControl*>(control)->SetStr("");
+            case Error::COULDNT_LOAD_SAMPLES:
+            {
+              static_cast<ITextControl*>(control)->SetStr("Couldn't load samples!");
 
-            break;
-          }
+              break;
+            }
 
-          case LoadingState::LOADING:
-          {
-            static_cast<ITextControl*>(control)->SetStr("Loading samples...");
+            default:
+            {
+              ASSERT(false, "Invalid case!");
 
-            break;
-          }
-
-          default:
-          {
-            ASSERT(false, "Invalid case!");
-
-            break;
+              break;
+            }
           }
         }
+
+        else
+        {
+          switch (_CurrentLoadingState)
+          {
+            case LoadingState::IDLE:
+            {
+              static_cast<ITextControl*>(control)->SetStr("");
+
+              break;
+            }
+
+            case LoadingState::LOADING:
+            {
+              static_cast<ITextControl*>(control)->SetStr("Loading samples...");
+
+              break;
+            }
+
+            default:
+            {
+              ASSERT(false, "Invalid case!");
+
+              break;
+            }
+          }
+        }
+        
       });
 
       pGraphics->AttachControl(information_text);
@@ -1054,7 +1078,7 @@ void InfinityGuitar::AsyncImportPackages() NOEXCEPT
  */
 void InfinityGuitar::ImportPackages(const Track track, const Channel channel) NOEXCEPT
 {
-  // Cache the folder.
+  //Cache the folder.
   DynamicString folder{ RetrievePluginPath("InfinityGuitar.vst3") };
 
 #if USE_OUTPUT_LOG
@@ -1078,6 +1102,9 @@ void InfinityGuitar::ImportPackages(const Track track, const Channel channel) NO
 #if USE_OUTPUT_LOG
     _OutputLog << "Tried to open file but failed: " << package_file_buffer << std::endl;
 #endif
+
+    //Set the error.
+    _Error = Error::COULDNT_LOAD_SAMPLES;
 
     //Signal that the plugin is "finished" loading samples, I guess.
     _HasFinishedLoadingSamples.Set();

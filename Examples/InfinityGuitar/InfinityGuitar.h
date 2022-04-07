@@ -91,6 +91,13 @@ private:
     LOADING
   };
 
+  //Enumeration covering all errors.
+  enum class Error : uint8
+  {
+    NONE,
+    COULDNT_LOAD_SAMPLES
+  };
+
   //The current loading state.
   LoadingState _CurrentLoadingState{ LoadingState::IDLE };
 
@@ -141,6 +148,9 @@ private:
 
   //The async loading thread.
   std::thread *RESTRICT _AsyncLoadingThread{ nullptr };
+
+  //The error.
+  Error _Error{ Error::NONE };
 
 #if USE_OUTPUT_LOG
   //The output log.
