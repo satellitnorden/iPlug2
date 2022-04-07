@@ -84,6 +84,16 @@ public:
 
 private:
 
+  //Enumeration covering all loading states.
+  enum class LoadingState : uint8
+  {
+    IDLE,
+    LOADING
+  };
+
+  //The current loading state.
+  LoadingState _CurrentLoadingState{ LoadingState::IDLE };
+
   //The notes.
   DynamicArray<InfinityGuitarNote> _Notes;
 
@@ -99,8 +109,20 @@ private:
   //The current track.
   Track _CurrentTrack{ Track::NONE };
 
+  //The wanted track.
+  Track _WantedTrack{Track::NONE};
+
+  //The loaded track.
+  Track _LoadedTrack{ Track::NONE };
+
   //The current channel.
   Channel _CurrentChannel{ Channel::NONE };
+
+  // The wanted channel.
+  Channel _WantedChannel{Channel::NONE};
+
+  //The loaded channel.
+  Channel _LoadedChannel{ Channel::NONE };
 
   //The humanize factor.
   float _HumanizeFactor{ 0.0f };
@@ -114,11 +136,11 @@ private:
   //The dead note random indexer.
   RandomIndexer<4> _DeadNoteRandomIndexer;
 
-  //Denotes whether or not the plugin wants to reload notes.
-  AtomicFlag _WantsToReloadNotes;
+  //Denotes whether or not loading samples has finished.
+  AtomicFlag _HasFinishedLoadingSamples;
 
-  //Denotes whether or not the plugin is ready to reload notes.
-  AtomicFlag _IsReadyToToReloadNotes;
+  //The async loading thread.
+  std::thread *RESTRICT _AsyncLoadingThread{ nullptr };
 
 #if USE_OUTPUT_LOG
   //The output log.
@@ -129,6 +151,11 @@ private:
   * Exports the packages.
   */
   void ExportPackages() NOEXCEPT;
+
+  /*
+  * Async imports packages.
+  */
+  void AsyncImportPackages() NOEXCEPT;
 
   /*
   * Imports the packages.

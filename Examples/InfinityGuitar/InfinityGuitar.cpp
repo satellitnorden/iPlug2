@@ -44,8 +44,34 @@ namespace InfinityGuitarLogic
 {
 
   /*
-   * Returns the string for a certain channel.
-   */
+  * Returns the string for a certain track.
+  */
+  FORCE_INLINE RESTRICTED NO_DISCARD const char *const RESTRICT GetTrackString(const InfinityGuitar::Track track) NOEXCEPT
+  {
+    switch (track)
+    {
+      case InfinityGuitar::Track::LEFT:
+      {
+        return "LEFT";
+      }
+
+      case InfinityGuitar::Track::RIGHT:
+      {
+        return "RIGHT";
+      }
+
+      default:
+      {
+        ASSERT(false, "Invalid case!");
+
+        return "";
+      }
+    }
+  }
+
+  /*
+  * Returns the string for a certain channel.
+  */
   FORCE_INLINE RESTRICTED NO_DISCARD const char* const RESTRICT GetChannelString(const InfinityGuitar::Channel channel) NOEXCEPT
   {
     switch (channel)
@@ -127,7 +153,7 @@ DynamicString RetrievePluginPath(const char* const RESTRICT plugin_name) NOEXCEP
 InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
   : iplug::Plugin(info, iplug::MakeConfig(NUMBER_OF_PARAMS, 1))
 {
-  // Set up the constant power lookup.
+  //Set up the constant power lookup.
   for (uint64 i{ 0 }, size{InfinityGuitarConstants::CONSTANT_POWER_LOOKUP.Size()}; i < size; ++i)
   {
     InfinityGuitarConstants::CONSTANT_POWER_LOOKUP[i] = CatalystBaseMath::SquareRoot(static_cast<float32>(i + 1)) / static_cast<float32>(i + 1);
@@ -174,8 +200,7 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
     pGraphics->AttachControl(new iplug::igraphics::ITextControl(bounds.GetCentredInside(512).GetVShifted(-32), "Tapped Muted notes : 70-79", iplug::igraphics::IText(24, iplug::igraphics::IColor(255, 255, 255, 255))));
     pGraphics->AttachControl(new iplug::igraphics::ITextControl(bounds.GetCentredInside(512).GetVShifted(0), "Dead notes : 60-69", iplug::igraphics::IText(24, iplug::igraphics::IColor(255, 255, 255, 255))));
 
-
-    // Create the row of knobs.
+    //Create the row of knobs.
     {
 #if USE_TRACK_KNOB
       iplug::igraphics::IVStyle style;
@@ -193,7 +218,10 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
 
       pGraphics->AttachControl(di_button);
 #endif
-      GetParam(TRACK_PARAM)->SetDisplayFunc([this](const double, WDL_String& string) { string.Set(_CurrentTrack == Track::LEFT ? "LEFT" : "RIGHT"); });
+      GetParam(TRACK_PARAM)->SetDisplayFunc([this](const double, WDL_String& string)
+      {
+        string.Set(InfinityGuitarLogic::GetTrackString(_WantedTrack));
+      });
     }
 
     {
@@ -206,7 +234,10 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
 
       pGraphics->AttachControl(channel_knob);
 
-      GetParam(CHANNEL_PARAM)->SetDisplayFunc([this](const double, WDL_String& string) { string.Set(InfinityGuitarLogic::GetChannelString(_CurrentChannel)); });
+      GetParam(CHANNEL_PARAM)->SetDisplayFunc([this](const double, WDL_String& string)
+      {
+        string.Set(InfinityGuitarLogic::GetChannelString(_WantedChannel));
+      });
     }
 
     {
@@ -246,14 +277,44 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
         string.Set(buffer);
       });
     }
+
+    {
+      iplug::igraphics::ITextControl *const RESTRICT information_text{ new iplug::igraphics::ITextControl( bounds.GetCentredInside(512).GetVShifted(235), "INFORMATION TEXT", iplug::igraphics::IText(20, iplug::igraphics::IColor(255, 255, 255, 255))) };
+
+      information_text->SetAnimation([this](IControl *const RESTRICT control)
+      {
+        switch (_CurrentLoadingState)
+        {
+          case LoadingState::IDLE:
+          {
+            static_cast<ITextControl*>(control)->SetStr("");
+
+            break;
+          }
+
+          case LoadingState::LOADING:
+          {
+            static_cast<ITextControl*>(control)->SetStr("Loading samples...");
+
+            break;
+          }
+
+          default:
+          {
+            ASSERT(false, "Invalid case!");
+
+            break;
+          }
+        }
+      });
+
+      pGraphics->AttachControl(information_text);
+    }
   };
 #endif
 
   //Export packages.
   //ExportPackages();
-
-  //Import packages.
-  ImportPackages(_CurrentTrack, _CurrentChannel);
 
 #if USE_OUTPUT_LOG
   //Open the output log.
@@ -266,6 +327,14 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
 
 InfinityGuitar::~InfinityGuitar()
 {
+  //Wait for the async loading thread, if necessary.
+  if (_AsyncLoadingThread)
+  {
+    _AsyncLoadingThread->join();
+    delete _AsyncLoadingThread;
+    _AsyncLoadingThread = nullptr;
+  }
+
 #if USE_OUTPUT_LOG
   // Close the output log.
   _OutputLog.close();
@@ -289,11 +358,9 @@ void InfinityGuitar::OnParamChange(int index)
     {
       const Track new_track{ static_cast<Track>(GetParam(TRACK_PARAM)->Int() + 1) };
 
-      if (_CurrentTrack != new_track)
+      if (_WantedTrack != new_track)
       {
-        _CurrentTrack = new_track;
-
-        ImportPackages(_CurrentTrack, _CurrentChannel);
+        _WantedTrack = new_track;
       }
 
     #if USE_OUTPUT_LOG
@@ -307,11 +374,9 @@ void InfinityGuitar::OnParamChange(int index)
     {
       const Channel new_Channel{static_cast<Channel>(GetParam(CHANNEL_PARAM)->Int() + 1)};
 
-      if (_CurrentChannel != new_Channel)
+      if (_WantedChannel != new_Channel)
       {
-        _CurrentChannel = new_Channel;
-
-        ImportPackages(_CurrentTrack, _CurrentChannel);
+        _WantedChannel = new_Channel;
       }
 
     #if USE_OUTPUT_LOG
@@ -339,30 +404,71 @@ void InfinityGuitar::OnParamChange(int index)
 
 void InfinityGuitar::ProcessBlock(sample** inputs, sample** outputs, int number_of_frames)
 {
+  //Check loading of samples.
+  switch (_CurrentLoadingState)
+  {
+    case LoadingState::IDLE:
+    {
+      //Should new samples be loaded?
+      if (_CurrentTrack != _WantedTrack || _CurrentChannel != _WantedChannel)
+      {
+        //Remove all playing notes.
+        _PlayingNotes.Clear();
+
+        //Async import the new packages!
+        AsyncImportPackages();
+
+        //Update the current loading state.
+        _CurrentLoadingState = LoadingState::LOADING;
+
+        return;
+      }
+
+      break;
+    }
+
+    case LoadingState::LOADING:
+    {
+      //Has the loading finished?
+      if (_HasFinishedLoadingSamples.IsSet())
+      {
+        //Join the thread.
+        _AsyncLoadingThread->join();
+
+        //Destroy the async loading thread.
+        delete _AsyncLoadingThread;
+        _AsyncLoadingThread = nullptr;
+
+        //Set the current track and channel.
+        _CurrentTrack = _LoadedTrack;
+        _CurrentChannel = _LoadedChannel;
+
+        //Update the current loading state.
+        _CurrentLoadingState = LoadingState::IDLE;
+      }
+
+      else
+      {
+        return;
+      }
+
+      break;
+    }
+
+    default:
+    {
+      ASSERT(false, "Invalid case!");
+
+      break;
+    }
+  }
+
   //Nothing to process if there are no notes.
-  if (_Notes.Empty())
+  if (_CurrentTrack == Track::NONE
+      || _CurrentChannel == Channel::NONE
+      || _Notes.Empty())
   {
     return;
-  }
-
-  //If the plugin wants to reload notes, signal that the plugin is ready to reload notes and return.
-  if (_WantsToReloadNotes.IsSet())
-  {
-    if (!_IsReadyToToReloadNotes.IsSet())
-    {
-      _IsReadyToToReloadNotes.Set();
-    }
-
-    return;
-  }
-
-  //Otherwise, the plugin is not ready to reload notes.
-  else
-  {
-    if (_IsReadyToToReloadNotes.IsSet())
-    {
-      _IsReadyToToReloadNotes.Clear();
-    }
   }
 
   //Cache the number of channels.
@@ -928,38 +1034,42 @@ void InfinityGuitar::ExportPackages() NOEXCEPT
 }
 
 /*
+* Async imports packages.
+*/
+void InfinityGuitar::AsyncImportPackages() NOEXCEPT
+{
+  //Set the loaded track and channel.
+  _LoadedTrack = _WantedTrack;
+  _LoadedChannel = _WantedChannel;
+
+  //Spawn the thread.
+  _AsyncLoadingThread = new std::thread([this]()
+  {
+    ImportPackages(_LoadedTrack, _LoadedChannel);
+  });
+}
+
+/*
  * Imports the packages.
  */
 void InfinityGuitar::ImportPackages(const Track track, const Channel channel) NOEXCEPT
 {
-  // Can't load samples if none parameters are set.
-  if (_CurrentTrack == Track::NONE || _CurrentChannel == Channel::NONE)
-  {
-    return;
-  }
-
-  // Signal that the plugin wants to reload notes.
-  _WantsToReloadNotes.Set();
-
-  // Wait for the plugin to become ready.
-  _WantsToReloadNotes.Wait<WaitMode::YIELD>();
-
   // Cache the folder.
-  DynamicString folder{RetrievePluginPath("InfinityGuitar.vst3")};
+  DynamicString folder{ RetrievePluginPath("InfinityGuitar.vst3") };
 
-  #if USE_OUTPUT_LOG
+#if USE_OUTPUT_LOG
   _OutputLog << "Folder: " << folder.Data() << std::endl;
-  #endif
+#endif
 
   // Add the folder name.
   folder += "\\InfinityGuitarPackages";
 
-  // Clear the notes.
+  //Clear the notes.
   _Notes.Clear();
 
-  // Open the first package file.
+  //Open the first package file.
   char package_file_buffer[MAX_PATH];
-  sprintf_s(package_file_buffer, "%s\\INFINITY_GUITAR_PACKAGE_%s_%s", folder.Data(), InfinityGuitarLogic::GetChannelString(_CurrentChannel), track == Track::LEFT ? "LEFT" : "RIGHT");
+  sprintf_s(package_file_buffer, "%s\\INFINITY_GUITAR_PACKAGE_%s_%s", folder.Data(), InfinityGuitarLogic::GetChannelString(channel), track == Track::LEFT ? "LEFT" : "RIGHT");
 
   BinaryFile<BinaryFileMode::IN> package_file{ package_file_buffer };
 
@@ -969,8 +1079,8 @@ void InfinityGuitar::ImportPackages(const Track track, const Channel channel) NO
     _OutputLog << "Tried to open file but failed: " << package_file_buffer << std::endl;
 #endif
 
-    // Signal that the plugin no longer wants to reload notes.
-    _WantsToReloadNotes.Clear();
+    //Signal that the plugin is "finished" loading samples, I guess.
+    _HasFinishedLoadingSamples.Set();
 
     return;
   }
@@ -1069,7 +1179,7 @@ void InfinityGuitar::ImportPackages(const Track track, const Channel channel) NO
   // Close the package file.
   package_file.Close();
 
-  // Signal that the plugin no longer wants to reload notes.
-  _WantsToReloadNotes.Clear();
+  //Signal the the plugin is finished loading samples.
+  _HasFinishedLoadingSamples.Set();
 }
 #endif
