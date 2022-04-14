@@ -8,6 +8,7 @@
 //Core.
 #include <Core/Algorithms/SortingAlgorithms.h>
 #include <Core/General/DynamicString.h>
+#include <Core/Utilities/TimeUtilities.h>
 
 //File.
 #undef IN
@@ -120,9 +121,9 @@ void DummyFunction()
  */
 DynamicString RetrievePluginPath(const char* const RESTRICT plugin_name) NOEXCEPT
 {
-  // Retrieve the folder.
+  //Retrieve the folder.
   char file_path[MAX_PATH];
-  HMODULE module_handle{nullptr};
+  HMODULE module_handle{ nullptr };
 
   if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)&DummyFunction, &module_handle) == 0)
   {
@@ -134,12 +135,12 @@ DynamicString RetrievePluginPath(const char* const RESTRICT plugin_name) NOEXCEP
     return DynamicString();
   }
 
-  // Skip the actual plugin name.
+  //Skip the actual plugin name.
   std::string file_path_string{file_path};
 
   {
-    std::string from{std::string("\\") + std::string(plugin_name)};
-    size_t start_position{file_path_string.find(from)};
+    std::string from{ std::string("\\") + std::string(plugin_name) };
+    size_t start_position{ file_path_string.find(from) };
 
     if (start_position != std::string::npos)
     {
@@ -208,7 +209,7 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
       style.labelText = iplug::igraphics::IText(24, iplug::igraphics::EVAlign::Top, iplug::igraphics::IColor(255, 255, 255, 255));
       style.valueText = iplug::igraphics::IText(16, iplug::igraphics::EVAlign::Bottom, iplug::igraphics::IColor(255, 255, 255, 255));
 
-      iplug::igraphics::IVKnobControl *const RESTRICT track_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(128).GetHShifted(-192), TRACK_PARAM, "Track", style) };
+      iplug::igraphics::IVKnobControl *const RESTRICT track_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(125).GetHShifted(-192), TRACK_PARAM, "Track", style) };
 
       pGraphics->AttachControl(track_knob);
 #else
@@ -230,7 +231,7 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
       style.labelText = iplug::igraphics::IText(24, iplug::igraphics::EVAlign::Top, iplug::igraphics::IColor(255, 255, 255, 255));
       style.valueText = iplug::igraphics::IText(16, iplug::igraphics::EVAlign::Bottom, iplug::igraphics::IColor(255, 255, 255, 255));
 
-      iplug::igraphics::IVKnobControl* const RESTRICT channel_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(128).GetHShifted(-64), CHANNEL_PARAM, "Channel", style) };
+      iplug::igraphics::IVKnobControl* const RESTRICT channel_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(125).GetHShifted(-64), CHANNEL_PARAM, "Channel", style) };
 
       pGraphics->AttachControl(channel_knob);
 
@@ -246,7 +247,7 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
       style.labelText = iplug::igraphics::IText(24, iplug::igraphics::EVAlign::Top, iplug::igraphics::IColor(255, 255, 255, 255));
       style.valueText = iplug::igraphics::IText(16, iplug::igraphics::EVAlign::Bottom, iplug::igraphics::IColor(255, 255, 255, 255));
 
-      iplug::igraphics::IVKnobControl *const RESTRICT humanize_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(128).GetHShifted(64), HUMANIZE_PARAM, "Humanize", style) };
+      iplug::igraphics::IVKnobControl *const RESTRICT humanize_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(125).GetHShifted(64), HUMANIZE_PARAM, "Humanize", style) };
 
       pGraphics->AttachControl(humanize_knob);
 
@@ -265,7 +266,7 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
       style.labelText = iplug::igraphics::IText(24, iplug::igraphics::EVAlign::Top, iplug::igraphics::IColor(255, 255, 255, 255));
       style.valueText = iplug::igraphics::IText(16, iplug::igraphics::EVAlign::Bottom, iplug::igraphics::IColor(255, 255, 255, 255));
 
-      iplug::igraphics::IVKnobControl *const RESTRICT release_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(128).GetHShifted(192), RELEASE_PARAM, "Release", style)};
+      iplug::igraphics::IVKnobControl *const RESTRICT release_knob{ new iplug::igraphics::IVKnobControl(bounds.GetCentredInside(128).GetVShifted(125).GetHShifted(192), RELEASE_PARAM, "Release", style)};
 
       pGraphics->AttachControl(release_knob);
 
@@ -279,15 +280,16 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
     }
 
     {
-      iplug::igraphics::ITextControl *const RESTRICT information_text{ new iplug::igraphics::ITextControl( bounds.GetCentredInside(512).GetVShifted(235), "INFORMATION TEXT", iplug::igraphics::IText(20, iplug::igraphics::IColor(255, 255, 255, 255))) };
+      iplug::igraphics::ITextControl *const RESTRICT information_text_1{ new iplug::igraphics::ITextControl( bounds.GetCentredInside(512).GetVShifted(210), "INFORMATION TEXT 1", iplug::igraphics::IText(22, iplug::igraphics::IColor(255, 255, 255, 255))) };
 
-      information_text->SetAnimation([this](IControl *const RESTRICT control)
+      information_text_1->SetAnimation([this](IControl* const RESTRICT control)
       {
         if (_Error != Error::NONE)
         {
           switch (_Error)
           {
-            case Error::COULDNT_LOAD_SAMPLES:
+            case Error::COULDNT_LOAD_SAMPLES_DIRECTORY_DOESNT_EXIST:
+            case Error::COULDNT_LOAD_SAMPLES_PACKAGE_FILE_OPEN_FAILED:
             {
               static_cast<ITextControl*>(control)->SetStr("Couldn't load samples!");
 
@@ -332,7 +334,89 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
         
       });
 
-      pGraphics->AttachControl(information_text);
+      pGraphics->AttachControl(information_text_1);
+    }
+
+    {
+      iplug::igraphics::ITextControl *const RESTRICT information_text_2{ new iplug::igraphics::ITextControl(bounds.GetCentredInside(512).GetVShifted(228), "INFORMATION TEXT 2", iplug::igraphics::IText(20, iplug::igraphics::IColor(255, 255, 255, 255)))};
+
+      information_text_2->SetAnimation([this](IControl* const RESTRICT control)
+      {
+        if (_Error != Error::NONE)
+        {
+          switch (_Error)
+          {
+            case Error::COULDNT_LOAD_SAMPLES_DIRECTORY_DOESNT_EXIST:
+            {
+              static_cast<ITextControl*>(control)->SetStr("Can't locate the \"InfinityGuitarPackages\" folder.");
+
+              break;
+            }
+
+            case Error::COULDNT_LOAD_SAMPLES_PACKAGE_FILE_OPEN_FAILED:
+            {
+              static_cast<ITextControl*>(control)->SetStr("Couldn't open the relevant package file.");
+
+              break;
+            }
+
+            default:
+            {
+              ASSERT(false, "Invalid case!");
+
+              break;
+            }
+          }
+        }
+
+        else
+        {
+          static_cast<ITextControl*>(control)->SetStr("");
+        }
+      });
+
+      pGraphics->AttachControl(information_text_2);
+    }
+
+    {
+      iplug::igraphics::ITextControl *const RESTRICT information_text_3{ new iplug::igraphics::ITextControl(bounds.GetCentredInside(512).GetVShifted(245), "INFORMATION TEXT 3", iplug::igraphics::IText(18, iplug::igraphics::IColor(255, 255, 255, 255)))};
+
+      information_text_3->SetAnimation([this](IControl *const RESTRICT control)
+      {
+        if (_Error != Error::NONE)
+        {
+          switch (_Error)
+          {
+            case Error::COULDNT_LOAD_SAMPLES_DIRECTORY_DOESNT_EXIST:
+            {
+              static_cast<ITextControl*>(control)->SetStr("Make sure to put the \"InfinityGuitarPackages\" folder next to \"InfinityGuitar.vst3\".");
+
+              break;
+            }
+
+            case Error::COULDNT_LOAD_SAMPLES_PACKAGE_FILE_OPEN_FAILED:
+            {
+              static_cast<ITextControl*>(control)->SetStr("");
+
+              break;
+            }
+
+            default:
+            {
+              ASSERT(false, "Invalid case!");
+
+              break;
+            }
+          }
+        }
+
+        else
+        {
+          static_cast<ITextControl*>(control)->SetStr("");
+        }
+      });
+
+      pGraphics->AttachControl(information_text_3);
     }
   };
 #endif
@@ -341,9 +425,13 @@ InfinityGuitar::InfinityGuitar(const InstanceInfo& info)
   //ExportPackages();
 
 #if USE_OUTPUT_LOG
+  //Retrieve the current date and time.
+  DynamicString current_date_and_time;
+  TimeUtilities::GetCurrentDateAndTime(&current_date_and_time);
+
   //Open the output log.
   char buffer[MAX_PATH];
-  sprintf_s(buffer, "Infinity Guitar Output Log %i.txt", CatalystRandomMath::RandomIntegerInRange<int32>(0, INT32_MAXIMUM));
+  sprintf_s(buffer, "Infinity Guitar Output Log - %s.txt", current_date_and_time.Data());
 
   _OutputLog.open(buffer);
 #endif
@@ -1085,15 +1173,27 @@ void InfinityGuitar::ImportPackages(const Track track, const Channel channel) NO
   _OutputLog << "Folder: " << folder.Data() << std::endl;
 #endif
 
-  // Add the folder name.
-  folder += "\\InfinityGuitarPackages";
+  //Add the folder name.
+  DynamicString packages_folder{ folder };
+  packages_folder += "\\InfinityGuitarPackages";
+
+  if (!std::filesystem::is_directory(std::filesystem::path(static_cast<const char*>(packages_folder.Data()))))
+  {
+    //Set the error.
+    _Error = Error::COULDNT_LOAD_SAMPLES_DIRECTORY_DOESNT_EXIST;
+
+    //Signal that the plugin is "finished" loading samples, I guess.
+    _HasFinishedLoadingSamples.Set();
+
+    return;
+  }
 
   //Clear the notes.
   _Notes.Clear();
 
   //Open the first package file.
   char package_file_buffer[MAX_PATH];
-  sprintf_s(package_file_buffer, "%s\\INFINITY_GUITAR_PACKAGE_%s_%s", folder.Data(), InfinityGuitarLogic::GetChannelString(channel), track == Track::LEFT ? "LEFT" : "RIGHT");
+  sprintf_s(package_file_buffer, "%s\\INFINITY_GUITAR_PACKAGE_%s_%s", packages_folder.Data(), InfinityGuitarLogic::GetChannelString(channel), track == Track::LEFT ? "LEFT" : "RIGHT");
 
   BinaryFile<BinaryFileMode::IN> package_file{ package_file_buffer };
 
@@ -1104,7 +1204,7 @@ void InfinityGuitar::ImportPackages(const Track track, const Channel channel) NO
 #endif
 
     //Set the error.
-    _Error = Error::COULDNT_LOAD_SAMPLES;
+    _Error = Error::COULDNT_LOAD_SAMPLES_DIRECTORY_DOESNT_EXIST;
 
     //Signal that the plugin is "finished" loading samples, I guess.
     _HasFinishedLoadingSamples.Set();

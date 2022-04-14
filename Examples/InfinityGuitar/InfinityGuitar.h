@@ -95,7 +95,8 @@ private:
   enum class Error : uint8
   {
     NONE,
-    COULDNT_LOAD_SAMPLES
+    COULDNT_LOAD_SAMPLES_DIRECTORY_DOESNT_EXIST,
+    COULDNT_LOAD_SAMPLES_PACKAGE_FILE_OPEN_FAILED
   };
 
   //The current loading state.
