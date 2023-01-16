@@ -140,7 +140,7 @@
 
   BEGIN_FACTORY_DEF(PLUG_MFR, PLUG_URL_STR, PLUG_EMAIL_STR)
 
-  DEF_CLASS2(INLINE_UID_FROM_FUID(FUID(VST3_PROCESSOR_UID)),
+  DEF_CLASS2(INLINE_UID_FROM_FUID(Steinberg::FUID(VST3_PROCESSOR_UID)),
               Steinberg::PClassInfo::kManyInstances,          // cardinality
               kVstAudioEffectClass,                           // the component category (don't change this)
               PLUG_NAME,                                      // plug-in name
