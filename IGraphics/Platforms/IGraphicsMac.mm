@@ -418,9 +418,13 @@ void IGraphicsMac::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAc
 
   if (fileName.GetLength())
     pDefaultFileName = [NSString stringWithCString:fileName.Get() encoding:NSUTF8StringEncoding];
-
+  else
+    pDefaultFileName = @"";
+  
   if (path.GetLength())
     pDefaultPath = [NSString stringWithCString:path.Get() encoding:NSUTF8StringEncoding];
+  else
+    pDefaultPath = @"";
 
   fileName.Set(""); // reset it
 
@@ -453,15 +457,17 @@ void IGraphicsMac::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAc
   {
     pPanel = [NSSavePanel savePanel];
     
+    [(NSSavePanel*) pPanel setAllowedFileTypes: pFileTypes];
     [(NSSavePanel*) pPanel setDirectoryURL: [NSURL fileURLWithPath: pDefaultPath]];
     [(NSSavePanel*) pPanel setNameFieldStringValue: pDefaultFileName];
-    [(NSSavePanel*) pPanel setAllowedFileTypes: pFileTypes];
     [(NSSavePanel*) pPanel setAllowsOtherFileTypes: NO];
   }
   else
   {
     pPanel = [NSOpenPanel openPanel];
     
+    [(NSOpenPanel*) pPanel setAllowedFileTypes: pFileTypes];
+    [(NSOpenPanel*) pPanel setDirectoryURL: [NSURL fileURLWithPath: pDefaultPath]];
     [(NSOpenPanel*) pPanel setCanChooseFiles:YES];
     [(NSOpenPanel*) pPanel setCanChooseDirectories:NO];
     [(NSOpenPanel*) pPanel setResolvesAliases:YES];

@@ -541,12 +541,13 @@ public:
   * @param shadow - the shadow to add */
   void ApplyLayerDropShadow(ILayerPtr& layer, const IShadow& shadow);
 
-protected:
-  /** Get the contents of a layers pixels as bitmap data
+  /** Get the contents of a layer as Raw RGBA bitmap data
+   * NOTE: you should only call this within IControl::Draw()
    * @param layer The layer to get the data from
    * @param data The pixel data extracted from the layer */
   virtual void GetLayerBitmapData(const ILayerPtr& layer, RawBitmapData& data) = 0;
   
+protected:
   /** Implemented by a graphics backend to apply a calculated shadow mask to a layer, according to the shadow settings specified
    * @param layer The layer to apply the shadow to
    * @param mask The mask of the shadow as raw bitmap data
@@ -849,9 +850,9 @@ public:
    * @param fileName Non const WDL_String reference specifying the file name. Set this prior to calling the method for save dialogs, to provide a default file name. For file-open dialogs, on successful selection of a file this will get set to the file’s name.
    * @param path WDL_String reference where the path will be put on success or empty string on failure/user cancelled
    * @param action Determines whether this is an file-open dialog or a file-save dialog
-   * @param extensions A space separated CString list of file extensions to filter in the dialog (e.g. “.wav .aif”
+   * @param ext A space separated CString list of file extensions to filter in the dialog (e.g. “.wav .aif”
    * @param completionHandler an IFileDialogCompletionHandlerFunc that will be called when a file is selected or the dialog is cancelled */
-  virtual void PromptForFile(WDL_String& fileName, WDL_String& path, EFileAction action = EFileAction::Open, const char* extensions = 0, IFileDialogCompletionHandlerFunc completionHandler = nullptr) = 0;
+  virtual void PromptForFile(WDL_String& fileName, WDL_String& path, EFileAction action = EFileAction::Open, const char* ext = "", IFileDialogCompletionHandlerFunc completionHandler = nullptr) = 0;
 
   /** Create a platform file prompt dialog to choose a directory path for opening/saving a directory. NOTE: this method will block the main thread
    * @param dir Non const WDL_String reference specifying the directory path. Set this prior to calling the method for save dialogs, to provide a default path. For load dialogs, on successful selection of a directory this will get set to the full path.
@@ -937,11 +938,12 @@ protected:
   /* Implemented on Windows to restore previous GL context calls ReleaseDC */
   virtual void DeactivateGLContext() {};
 
-  /** \todo
-   * @param control \todo
-   * @param text \todo
-   * @param bounds \todo
-   * @param str \todo */
+  /** Creates a platform native text entry field.
+  * @param paramIdx The index of the parameter associated with the text entry field.
+  * @param text The text to be displayed in the text entry field.
+  * @param bounds The rectangle that defines the size and position of the text entry field.
+  * @param length The maximum allowed length of the text in the text entry field.
+  * @param str The initial string to be displayed in the text entry field. */
   virtual void CreatePlatformTextEntry(int paramIdx, const IText& text, const IRECT& bounds, int length, const char* str) = 0;
   
   /** Calls the platform backend to create the platform popup menu
@@ -1631,7 +1633,7 @@ public:
 
   /** Registers a gesture recognizer with the graphics context
    * @param type The type of gesture recognizer */
-  virtual void AttachGestureRecognizer(EGestureType type); //TODO: should be protected?
+  virtual void AttachGestureRecognizer(EGestureType type);
   
   /** Attach a gesture recognizer to a rectangular region of the GUI, i.e. not linked to an IControl
    * @param bounds The area that should recognize the gesture
@@ -1682,11 +1684,6 @@ protected:
 
   /** @return bool \c true if the drawing backend flips images (e.g. OpenGL) */
   virtual bool FlippedBitmap() const = 0;
-
-  /** Utility used by SearchImageResource/SearchBitmapInCache
-   * @param sourceScale \todo
-   * @param targetScale \todo */
-  inline void SearchNextScale(int& sourceScale, int targetScale);
 
   /** Search for a bitmap image resource matching the target scale 
    * @param fileName \todo
