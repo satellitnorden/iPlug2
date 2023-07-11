@@ -48,8 +48,8 @@ IGraphics::IGraphics(IGEditorDelegate& dlg, int w, int h, int fps, float scale)
 , mHeight(h)
 , mFPS(fps)
 , mDrawScale(scale)
-, mMinScale(scale / 2)
-, mMaxScale(scale * 2)
+, mMinScale(DEFAULT_MIN_DRAW_SCALE)
+, mMaxScale(DEFAULT_MAX_DRAW_SCALE)
 , mDelegate(&dlg)
 {
   StaticStorage<APIBitmap>::Accessor bitmapStorage(sBitmapCache);
@@ -119,6 +119,12 @@ void IGraphics::Resize(int w, int h, float scale, bool needsPlatformResize)
 void IGraphics::SetLayoutOnResize(bool layoutOnResize)
 {
   mLayoutOnResize = layoutOnResize;
+}
+
+void IGraphics::SetScaleConstraints(float lo, float hi)
+{
+  mMinScale = std::min(lo, hi);
+  mMaxScale = std::max(lo, hi);
 }
 
 void IGraphics::RemoveControlWithTag(int ctrlTag)
@@ -203,25 +209,22 @@ void IGraphics::RemoveAllControls()
   mControls.Empty(true);
 }
 
-void IGraphics::SetControlPosition(int idx, float x, float y)
+void IGraphics::SetControlPosition(IControl* pControl, float x, float y)
 {
-  IControl* pControl = GetControl(idx);
   pControl->SetPosition(x, y);
   if (!pControl->IsHidden())
     SetAllControlsDirty();
 }
 
-void IGraphics::SetControlSize(int idx, float w, float h)
+void IGraphics::SetControlSize(IControl* pControl, float w, float h)
 {
-  IControl* pControl = GetControl(idx);
   pControl->SetSize(w, h);
   if (!pControl->IsHidden())
     SetAllControlsDirty();
 }
 
-void IGraphics::SetControlBounds(int idx, const IRECT& r)
+void IGraphics::SetControlBounds(IControl* pControl, const IRECT& r)
 {
-  IControl* pControl = GetControl(idx);
   pControl->SetTargetAndDrawRECTs(r);
   if (!pControl->IsHidden())
     SetAllControlsDirty();
@@ -754,6 +757,14 @@ void IGraphics::DrawBitmapedText(const IBitmap& bitmap, const IRECT& bounds, ITe
   }
 }
 
+void IGraphics::DrawLineAcross(const IColor& color, const IRECT& bounds, EDirection dir, float pos, const IBlend* pBlend, float thickness)
+{
+  if (dir == EDirection::Horizontal)
+    DrawHorizontalLine(color, bounds, pos, pBlend, thickness);
+  else
+    DrawVerticalLine(color, bounds, pos, pBlend, thickness);
+}
+
 void IGraphics::DrawVerticalLine(const IColor& color, const IRECT& bounds, float x, const IBlend* pBlend, float thickness)
 {
   x = Clip(x, 0.0f, 1.0f);
@@ -805,7 +816,14 @@ bool IGraphics::IsDirty(IRECTList& rects)
     if (pControl->IsDirty())
     {
       // N.B padding outlines for single line outlines
-      rects.Add(pControl->GetRECT().GetPadded(0.75));
+      auto rectToAdd = pControl->GetRECT().GetPadded(0.75);
+      
+      if (pControl->GetParent())
+      {
+        rectToAdd.Clank(pControl->GetParent()->GetRECT().GetPadded(0.75));
+      }
+      
+      rects.Add(rectToAdd);
       dirty = true;
     }
   };
@@ -849,6 +867,20 @@ void IGraphics::DrawControl(IControl* pControl, const IRECT& bounds, float scale
 
     if (clipBounds.W() <= 0.0 || clipBounds.H() <= 0)
       return;
+    
+    IControl* pParent = pControl->GetParent();
+    
+    while (pParent)
+    {
+      IRECT parentBounds = pParent->GetRECT().GetPadded(0.75).GetPixelAligned(scale);
+
+      if(!clipBounds.Intersects(parentBounds))
+        return;
+
+      clipBounds.Clank(parentBounds);
+      
+      pParent = pParent->GetParent();
+    }
     
     PrepareRegion(clipBounds);
     pControl->Draw(*this);
@@ -1250,7 +1282,7 @@ int IGraphics::GetMouseControlIdx(float x, float y, bool mouseOver)
         }
 #ifndef NDEBUG
       }
-      else if (pControl->GetRECT().Contains(x, y))
+      else if (pControl->GetRECT().Contains(x, y) && pControl->GetParent() == nullptr)
       {
         return c;
       }
@@ -1282,6 +1314,7 @@ IControl* IGraphics::GetMouseControl(float x, float y, bool capture, bool mouseO
   
   if (!pControl && mTextEntryControl && mTextEntryControl->EditInProgress())
     pControl = mTextEntryControl.get();
+  
   
 #if !defined(NDEBUG)
   if (!pControl && mLiveEdit)

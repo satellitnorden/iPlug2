@@ -172,19 +172,15 @@ struct ISVG
   /** The width of the SVG */
   float W() const
   {
-    if (mSVGDom)
-      return mSVGDom->containerSize().width();
-    else
-      return 0;
+    assert(mSVGDom);
+    return mSVGDom->containerSize().width();
   }
   
   /** The height of the SVG */
   float H() const
   {
-    if (mSVGDom)
-      return mSVGDom->containerSize().height();
-    else
-      return 0;
+    assert(mSVGDom);
+    return mSVGDom->containerSize().height();
   }
   
   /** @return \true if the SVG has valid data */
@@ -203,19 +199,15 @@ struct ISVG
   /** @return The width of the SVG */
   float W() const
   {
-    if (mImage)
-      return mImage->width;
-    else
-      return 0;
+    assert(mImage);
+    return mImage->width;
   }
 
   /** @return The height of the SVG */
   float H() const
   {
-    if (mImage)
-      return mImage->height;
-    else
-      return 0;
+    assert(mImage);
+    return mImage->height;
   }
   
   /** @return \true if the SVG has valid data */
@@ -420,7 +412,7 @@ struct IColor
   {
     WDL_String str(hexStr);
     
-    if(str.GetLength() == 7 && str.Get()[0] == '#')
+    if ((str.GetLength() == 7 || str.GetLength() == 9) && str.Get()[0] == '#')
     {
       str.DeleteSub(0, 1);
 
@@ -440,9 +432,12 @@ struct IColor
   }
   
   /** Convert the IColor to a hex string e.g. "#ffffffff" */
-  void ToColorCodeStr(WDL_String& str) const
+  void ToColorCodeStr(WDL_String& str, bool withAlpha = true) const
   {
-    str.SetFormatted(32, "#%02x%02x%02x%02x", R, G, B, A);
+    if (withAlpha)
+      str.SetFormatted(32, "#%02x%02x%02x%02x", R, G, B, A);
+    else
+      str.SetFormatted(32, "#%02x%02x%02x", R, G, B);
   }
   
   /** Create an IColor from Hue Saturation and Luminance values
@@ -1412,8 +1407,8 @@ struct IRECT
       return IRECT(L, T, R, T + h);
   }
   
-  /** \todo 
-   * @param rhs \todo */
+  /** Clank will limit this IRECT's bounds based on the boundaries of the IRECT passed in as an argument
+   * @param rhs The rectangle to limit with  */
   void Clank(const IRECT& rhs)
   {
     if (L < rhs.L)
