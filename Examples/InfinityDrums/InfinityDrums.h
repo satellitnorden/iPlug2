@@ -32,14 +32,16 @@ enum class DrumPart : uint8
   SPLASH,
   LEFT_CRASH,
   HIHAT_PEDAL,
+  HIHAT_SPLASH,
   HIHAT_FULLY_CLOSED,
   HIHAT_LEVEL_0,
   HIHAT_LEVEL_1,
   HIHAT_LEVEL_2,
   HIHAT_LEVEL_3,
   HIHAT_LEVEL_4,
+  HIHAT_LEVEL_5,
   HIHAT_FULLY_OPEN,
-  LEFT_WIDE_CRASH,
+  WIDE_LEFT_CRASH,
   STACK,
 
   NUMBER_OF_DRUM_PARTS,
@@ -47,10 +49,10 @@ enum class DrumPart : uint8
   NONE
 };
 
-// Alesis drums constants.
-namespace AlesisDrumsConstants
+//Infinity drums constants.
+namespace InfinityDrumsConstants
 {
-  constexpr uint8 NUMBER_OF_LAYERS{ 10 };
+  constexpr uint8 NUMBER_OF_LAYERS{ 12 };
 }
 
 class DrumPartProperties final
@@ -58,35 +60,17 @@ class DrumPartProperties final
 
 public:
 
-  //Enumeration covering all velocity curves.
-  enum class VelocityCurve : uint8
-  {
-    LINEAR,
-    HALF_INVERSE_SQUARE,
-    INVERSE_SQUARE,
-    MAXIMUM
-  };
-
   //The drum part string.
   const char* RESTRICT _DrumPartString;
 
   //The sound resources.
-  DynamicArray<StaticArray<SoundResource, AlesisDrumsConstants::NUMBER_OF_LAYERS>> _SoundResources;
+  DynamicArray<StaticArray<SoundResource, InfinityDrumsConstants::NUMBER_OF_LAYERS>> _SoundResources;
 
   //The random indexer.
-  RandomIndexer<AlesisDrumsConstants::NUMBER_OF_LAYERS> _RandomIndexer;
+  RandomIndexer<InfinityDrumsConstants::NUMBER_OF_LAYERS> _RandomIndexer;
 
   //The midi number.
   uint32 _MidiNumber;
-
-  //The velocity curve.
-  VelocityCurve _VelocityCurve;
-
-  //The pan.
-  float32 _Pan;
-
-  //The gain.
-  float32 _Gain;
 
 };
 
@@ -130,6 +114,9 @@ private:
 
   //The playing notes.
   DynamicArray<PlayingNote> _PlayingNotes;
+
+  //The current hihat CC value.
+  float32 _CurrentHihatCCValue{ 0.0f };
 
   /*
   * Exports packages.

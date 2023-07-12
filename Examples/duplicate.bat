@@ -1,2 +1,2 @@
-"C:\Users\Denni\AppData\Local\Programs\Python\Python38-32\python.exe" duplicate.py AlesisDrums InfinityDrums DaybreakStudio
+"C:\Users\Dennis\AppData\Local\Programs\Python\Python311\python.exe" duplicate.py EternityDrums DrumEngine DaybreakStudio
 pause
