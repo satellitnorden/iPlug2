@@ -1,3 +1,5 @@
+#define DEBUG_PLUGIN (0)
+
 #define PLUG_NAME "Drum Engine"
 #define PLUG_MFR "Daybreak Studio"
 #define PLUG_VERSION_HEX 0x00010000
@@ -15,14 +17,21 @@
 
 #define SHARED_RESOURCES_SUBPATH "DrumEngine"
 
-#define PLUG_CHANNEL_IO "1-1 2-2"
+#if DEBUG_PLUGIN
+  #define PLUG_CHANNEL_IO "0-1 0-2"
+#else
+  #define PLUG_CHANNEL_IO "0-1 0-2 0-3 0-4 0-5 0-6 0-7 0-8 "         \
+                          "0-9 0-10 0-11 0-12 0-13 0-14 0-15 0-16 "  \
+                          "0-17 0-18 0-19 0-20 0-21 0-22 0-23 0-24 " \
+                          "0-25 0-26 0-27 0-28 0-29 0-30 0-31 0-32 "
+#endif
 
 #define PLUG_LATENCY 0
 #define PLUG_TYPE 1
 #define PLUG_DOES_MIDI_IN 1
 #define PLUG_DOES_MIDI_OUT 0
 #define PLUG_DOES_MPE 0
-#define PLUG_DOES_STATE_CHUNKS 0
+#define PLUG_DOES_STATE_CHUNKS 1
 #define PLUG_HAS_UI 1
 #define PLUG_WIDTH 1024
 #define PLUG_HEIGHT 512
