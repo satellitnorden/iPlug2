@@ -171,9 +171,316 @@ public:
 };
 
 /*
- * Dropdown menu class definition.
+* Drum Engine Plugin Text Control class definition.
+*/
+class DrumEnginePluginTextControl final : public DrumEnginePluginControl
+{
+
+public:
+
+  enum class Function : uint8
+  {
+    MIXER_CHANNEL
+  };
+
+  DrumEnginePluginTextControl(DrumEnginePlugin *const RESTRICT plugin, const iplug::igraphics::IRECT &bounds, const Function function, const uint32 extra_data_1 = 0)
+    :
+    DrumEnginePluginControl(bounds)
+  {
+    _Plugin = plugin;
+    _Function = function;
+    _ExtraData1 = extra_data_1;
+
+    CreatePopupMenu();
+  }
+
+  void Draw(IGraphics& graphics) override
+  {
+    CalculateName();
+
+    graphics.DrawText(IText(16, IColor(255, 255, 255, 255)), _Name.Data(), mRECT);
+  }
+
+private:
+
+  DrumEnginePlugin* RESTRICT _Plugin;
+  Function _Function;
+  uint32 _ExtraData1;
+  DynamicString _Name;
+
+  void CalculateName()
+  {
+    switch (_Function)
+    {
+      case Function::MIXER_CHANNEL:
+      {
+        const DrumEngineUserInterfaceInformation user_interface_information{_Plugin->_DrumEngine.GetUserInterfaceInformation()};
+
+        if ((_ExtraData1 + _Plugin->_StartMixerChannelIndex) < user_interface_information._NumberOfMixerChannels)
+        {
+          const DrumEngineMixerChannel& mixer_channel{user_interface_information._MixerChannels[(_ExtraData1 + _Plugin->_StartMixerChannelIndex)]};
+
+          _Name = mixer_channel._Name.Data();
+        }
+
+        else
+        {
+          _Name = "";
+        }
+
+        break;
+      }
+
+      default:
+      {
+        _Name = "";
+
+        break;
+      }
+    }
+  }
+
+};
+
+/*
+ * Drum Engine Plugin Button Control class definition.
  */
-class DropDownMenu final : public DrumEnginePluginControl
+class DrumEnginePluginButtonControl final : public DrumEnginePluginControl
+{
+
+public:
+
+  enum class Function : uint8
+  {
+    PREVIOUS_MIXER_CHANNELS,
+    NEXT_MIXER_CHANNELS
+  };
+
+  DrumEnginePluginButtonControl(DrumEnginePlugin *const RESTRICT plugin, const iplug::igraphics::IRECT &bounds, const Function function, const uint32 extra_data_1 = 0)
+    :
+    DrumEnginePluginControl(bounds)
+  {
+    _Plugin = plugin;
+    _Function = function;
+    _ExtraData1 = extra_data_1;
+  }
+
+  /*
+   * Callback for when this control need to be rebuilt.
+   */
+  FORCE_INLINE void Rebuild() NOEXCEPT override
+  {
+    //Call parent function.
+    DrumEnginePluginControl::Rebuild();
+
+    //Calculate hidden.
+    CalculateHidden();
+  }
+
+  void OnMouseDown(float X, float Y, const IMouseMod &mod) override
+  {
+    IControl::OnMouseDown(X, Y, mod);
+
+    if (_IsHidden)
+    {
+        return;
+    }
+
+    _CurrentHoverState = HoverState::CLICKED;
+
+    Execute();
+
+    SetDirty();
+  }
+
+  void OnMouseOver(float X, float Y, const IMouseMod &mod) override
+  {
+    IControl::OnMouseOver(X, Y, mod);
+
+    if (_IsHidden)
+    {
+        return;
+    }
+
+    if (_CurrentHoverState != HoverState::CLICKED)
+    {
+        _CurrentHoverState = HoverState::HOVERED;
+    }
+
+    SetDirty();
+  }
+
+  void OnMouseOut() override
+  {
+    IControl::OnMouseOut();
+
+    if (_IsHidden)
+    {
+        return;
+    }
+
+    if (_CurrentHoverState != HoverState::CLICKED)
+    {
+        _CurrentHoverState = HoverState::IDLE;
+    }
+
+    SetDirty();
+  }
+
+  void Draw(IGraphics &graphics) override
+  {
+    if (_IsHidden)
+    {
+        return;
+    }
+
+    CalculateName();
+
+    graphics.FillRect(GetButtonColor(), mRECT);
+    graphics.DrawText(IText(16, IColor(255, 255, 255, 255)), _Name.Data(), mRECT);
+  }
+
+private:
+
+  enum class HoverState : uint8
+  {
+    IDLE,
+    HOVERED,
+    CLICKED
+  };
+
+  DrumEnginePlugin* RESTRICT _Plugin;
+  Function _Function;
+  uint32 _ExtraData1;
+  DynamicString _Name;
+  HoverState _CurrentHoverState{ HoverState::IDLE };
+  bool _IsHidden{ false };
+
+  void CalculateName()
+  {
+    switch (_Function)
+    {
+      case Function::PREVIOUS_MIXER_CHANNELS:
+      {
+          _Name = "Previous";
+
+          break;
+      }
+
+       case Function::NEXT_MIXER_CHANNELS:
+       {
+          _Name = "Next";
+
+          break;
+      }
+
+      default:
+      {
+          _Name = "ERROR";
+
+          break;
+      }
+    }
+  }
+
+  IColor GetButtonColor()
+  {
+    switch (_CurrentHoverState)
+    {
+      case HoverState::IDLE:
+      {
+          return IColor(200, 25, 25, 25);
+      }
+
+      case HoverState::HOVERED:
+      {
+          return IColor(200, 75, 75, 75);
+      }
+
+      case HoverState::CLICKED:
+      {
+          return IColor(200, 125, 125, 125);
+      }
+
+      default:
+      {
+          return IColor(200, 25, 25, 25);
+      }
+    }
+  }
+
+  void Execute()
+  {
+    if (_IsHidden)
+    {
+      return;
+    }
+
+    switch (_Function)
+    {
+      case Function::PREVIOUS_MIXER_CHANNELS:
+      {
+        _Plugin->_StartMixerChannelIndex -= 8;
+        _Plugin->_RebuildUI = true;
+
+        break;
+      }
+
+      case Function::NEXT_MIXER_CHANNELS:
+      {
+        _Plugin->_StartMixerChannelIndex += 8;
+        _Plugin->_RebuildUI = true;
+
+        break;
+      }
+    }
+
+    if (mMouseIsOver)
+    {
+        _CurrentHoverState = HoverState::HOVERED;
+    }
+
+    else
+    {
+        _CurrentHoverState = HoverState::IDLE;
+    }
+  }
+
+  void CalculateHidden() NOEXCEPT
+  {
+    switch (_Function)
+    {
+      case Function::PREVIOUS_MIXER_CHANNELS:
+      {
+        _IsHidden = _Plugin->_StartMixerChannelIndex == 0;
+
+        break;
+      }
+
+      case Function::NEXT_MIXER_CHANNELS:
+      {
+        const DrumEngineUserInterfaceInformation user_interface_information{_Plugin->_DrumEngine.GetUserInterfaceInformation()};
+
+        _IsHidden = _Plugin->_StartMixerChannelIndex + 8 >= user_interface_information._NumberOfMixerChannels;
+
+        break;
+      }
+    }
+
+    if (_IsHidden)
+    {
+        _CurrentHoverState = HoverState::IDLE;
+
+        return;
+    }
+  }
+
+};
+
+/*
+ * Drum Engine Plugin Drop Down Menu Control class definition.
+ */
+class DrumEnginePluginDropDownMenuControl final : public DrumEnginePluginControl
 {
 
 public:
@@ -184,7 +491,7 @@ public:
     MIXER_CHANNEL
   };
 
-  DropDownMenu(DrumEnginePlugin *const RESTRICT plugin, const iplug::igraphics::IRECT &bounds, const Function function, const uint32 extra_data_1 = 0)
+  DrumEnginePluginDropDownMenuControl(DrumEnginePlugin* const RESTRICT plugin, const iplug::igraphics::IRECT& bounds, const Function function, const uint32 extra_data_1 = 0)
     :
     DrumEnginePluginControl(bounds)
   {
@@ -203,6 +510,9 @@ public:
     //Call parent function.
     DrumEnginePluginControl::Rebuild();
 
+    //Calculate hidden.
+    CalculateHidden();
+
     //Do function-specific things.
     switch (_Function)
     {
@@ -219,6 +529,11 @@ public:
   {
     IControl::OnMouseDown(X, Y, mod);
 
+    if (_IsHidden)
+    {
+      return;
+    }
+
     _CurrentHoverState = HoverState::CLICKED;
 
     Execute();
@@ -229,6 +544,11 @@ public:
   void OnMouseOver(float X, float Y, const IMouseMod &mod) override
   {
     IControl::OnMouseOver(X, Y, mod);
+
+    if (_IsHidden)
+    {
+      return;
+    }
 
     if (_CurrentHoverState != HoverState::CLICKED)
     {
@@ -242,6 +562,11 @@ public:
   {
     IControl::OnMouseOut();
 
+    if (_IsHidden)
+    {
+      return;
+    }
+
     if (_CurrentHoverState != HoverState::CLICKED)
     {
       _CurrentHoverState = HoverState::IDLE;
@@ -252,6 +577,11 @@ public:
 
   void Draw(IGraphics &graphics) override
   {
+    if (_IsHidden)
+    {
+      return;
+    }
+
     CalculateName();
 
     graphics.FillRect(GetButtonColor(), mRECT);
@@ -273,6 +603,7 @@ private:
   DynamicString _Name;
   HoverState _CurrentHoverState{ HoverState::IDLE };
   IPopupMenu _PopupMenu;
+  bool _IsHidden{ false };
 
   void CreatePopupMenu() NOEXCEPT
   {
@@ -294,9 +625,9 @@ private:
       {
         const DrumEngineUserInterfaceInformation user_interface_information{_Plugin->_DrumEngine.GetUserInterfaceInformation()};
 
-        if (_ExtraData1 < user_interface_information._NumberOfMixerChannels)
+        if ((_ExtraData1 + _Plugin->_StartMixerChannelIndex) < user_interface_information._NumberOfMixerChannels)
         {
-          const DrumEngineMixerChannel &mixer_channel{user_interface_information._MixerChannels[_ExtraData1]};
+          const DrumEngineMixerChannel &mixer_channel{user_interface_information._MixerChannels[(_ExtraData1 + _Plugin->_StartMixerChannelIndex)]};
 
           if (mixer_channel._IsStereo)
           {
@@ -354,15 +685,15 @@ private:
       {
         const DrumEngineUserInterfaceInformation user_interface_information{ _Plugin->_DrumEngine.GetUserInterfaceInformation() };
 
-        if (_ExtraData1 < user_interface_information._NumberOfMixerChannels)
+        if ((_ExtraData1 + _Plugin->_StartMixerChannelIndex) < user_interface_information._NumberOfMixerChannels)
         {
-          const DrumEngineMixerChannel &mixer_channel{ user_interface_information._MixerChannels[_ExtraData1] };
-          const uint32 mixer_routing{ _Plugin->_SaveData._Preset._MixerRouting._Routing[_ExtraData1] };
+          const DrumEngineMixerChannel &mixer_channel{ user_interface_information._MixerChannels[(_ExtraData1 + _Plugin->_StartMixerChannelIndex)] };
+          const uint32 mixer_routing{ _Plugin->_SaveData._Preset._MixerRouting._Routing[(_ExtraData1 + _Plugin->_StartMixerChannelIndex)] };
 
           if (mixer_channel._IsStereo)
           {
             char buffer[128];
-            sprintf_s(buffer, "%s: %u / %u", mixer_channel._Name.Data(), mixer_routing + 1, mixer_routing + 2);
+            sprintf_s(buffer, "%u / %u", mixer_routing + 1, mixer_routing + 2);
 
             _Name = buffer;
           }
@@ -370,7 +701,7 @@ private:
           else
           {
             char buffer[128];
-            sprintf_s(buffer, "%s: %u ", mixer_channel._Name.Data(), mixer_routing + 1);
+            sprintf_s(buffer, "%u ", mixer_routing + 1);
 
             _Name = buffer;
           }
@@ -444,7 +775,7 @@ private:
         case Function::MIXER_CHANNEL:
         {
           //Update the preset.
-          _Plugin->_SaveData._Preset._MixerRouting._Routing[_ExtraData1] = chosen_item_index;
+          _Plugin->_SaveData._Preset._MixerRouting._Routing[(_ExtraData1 + _Plugin->_StartMixerChannelIndex)] = chosen_item_index;
 
           //Apply the preset!
           _Plugin->_DrumEngine.ApplyPreset(_Plugin->_SaveData._Preset);
@@ -464,6 +795,36 @@ private:
       _CurrentHoverState = HoverState::IDLE;
     }
   }
+
+  void CalculateHidden() NOEXCEPT
+  {
+    switch (_Function)
+    {
+      case Function::SOUNDBANK:
+      {
+        _IsHidden = false;
+
+        break;
+      }
+
+      case Function::MIXER_CHANNEL:
+      {
+        const DrumEngineUserInterfaceInformation user_interface_information{ _Plugin->_DrumEngine.GetUserInterfaceInformation() };
+
+        _IsHidden = _Plugin->_StartMixerChannelIndex + _ExtraData1 >= user_interface_information._NumberOfMixerChannels;
+
+        break;
+      }
+    }
+
+    if (_IsHidden)
+    {
+        _CurrentHoverState = HoverState::IDLE;
+
+        return;
+    }
+  }
+
 };
 
 DrumEnginePlugin::DrumEnginePlugin(const InstanceInfo& info)
@@ -500,19 +861,104 @@ DrumEnginePlugin::DrumEnginePlugin(const InstanceInfo& info)
 
     //Add the soundbank drop down menu.
     {
-      DropDownMenu *const RESTRICT control{new DropDownMenu(this, bounds.GetCentredInside(256).GetMidVPadded(16).GetVShifted(-175), DropDownMenu::Function::SOUNDBANK)};
+      DrumEnginePluginDropDownMenuControl *const RESTRICT control
+      {
+        new DrumEnginePluginDropDownMenuControl
+        (
+          this,
+          bounds.GetCentredInside(256).GetMidVPadded(16).GetVShifted(-175),
+          DrumEnginePluginDropDownMenuControl::Function::SOUNDBANK
+        )
+      };
       pGraphics->AttachControl(control);
       _Controls.Emplace(control);
     }
 
-    //Add the mixer channel drop down menus.
-    for (uint32 i{ 0 }; i < 32; ++i)
+    //Add the mixer channel controls
     {
-      const uint32 column_index{ i / 8 };
-      const uint32 row_index{ i % 8 };
-      DropDownMenu *const RESTRICT control{new DropDownMenu(this, bounds.GetCentredInside(96).GetMidVPadded(12).GetHShifted(-400.0f + (112.5f * static_cast<float32>(row_index))).GetVShifted(125.0f + 32.0f * static_cast<float32>(column_index)), DropDownMenu::Function::MIXER_CHANNEL, i)};
-      pGraphics->AttachControl(control);
-      _Controls.Emplace(control);
+      constexpr uint32 NUMBER_OF_CONTROLS_PER_ROW{ 8 };
+      constexpr float32 PLUGIN_WIDTH{ static_cast<float32>(PLUG_WIDTH) };
+      constexpr float32 PLUGIN_HEIGHT{ static_cast<float32>(PLUG_HEIGHT) };
+      constexpr float32 CONTROL_WIDTH{ 122.5f };
+      constexpr float32 CONTROL_HEIGHT{ 12.0f };
+      constexpr float32 CONTROL_PADDING{ (PLUGIN_WIDTH - (CONTROL_WIDTH * static_cast<float32>(NUMBER_OF_CONTROLS_PER_ROW))) / static_cast<float32>(NUMBER_OF_CONTROLS_PER_ROW + 1) };
+      constexpr float32 CONTROL_START_X{ -(PLUGIN_WIDTH * 0.5f) + (CONTROL_WIDTH * 0.5f) + CONTROL_PADDING };
+      constexpr float32 CONTROL_START_Y{ (PLUGIN_HEIGHT * 0.5f) - CONTROL_HEIGHT - CONTROL_PADDING };
+
+      for (uint32 i{ 0 }; i < NUMBER_OF_CONTROLS_PER_ROW; ++i)
+      {
+        float32 current_y{ 0.0f };
+
+        //Add the previous/next button.
+        if (i == 3)
+        {
+          DrumEnginePluginButtonControl *const RESTRICT control
+          {
+            new DrumEnginePluginButtonControl
+            (
+              this,
+              bounds.GetCentredInside(CONTROL_WIDTH * 0.5f).GetMidVPadded(CONTROL_HEIGHT).GetHShifted(CONTROL_START_X + ((CONTROL_WIDTH + CONTROL_PADDING) * static_cast<float32>(i))).GetVShifted(CONTROL_START_Y - current_y),
+              DrumEnginePluginButtonControl::Function::PREVIOUS_MIXER_CHANNELS,
+              i
+            )
+          };
+          pGraphics->AttachControl(control);
+          _Controls.Emplace(control);
+        }
+
+        else if (i == 4)
+        {
+          DrumEnginePluginButtonControl *const RESTRICT control
+          {
+            new DrumEnginePluginButtonControl
+            (
+              this,
+              bounds.GetCentredInside(CONTROL_WIDTH * 0.5f).GetMidVPadded(CONTROL_HEIGHT).GetHShifted(CONTROL_START_X + ((CONTROL_WIDTH + CONTROL_PADDING) * static_cast<float32>(i))).GetVShifted(CONTROL_START_Y - current_y),
+              DrumEnginePluginButtonControl::Function::NEXT_MIXER_CHANNELS,
+              i)
+          };
+          pGraphics->AttachControl(control);
+          _Controls.Emplace(control);
+        }
+
+        current_y += CONTROL_HEIGHT * 2.0f + CONTROL_PADDING;
+
+        //Add the routing control.
+        {
+          DrumEnginePluginDropDownMenuControl *const RESTRICT control
+          {
+            new DrumEnginePluginDropDownMenuControl
+            (
+              this,
+              bounds.GetCentredInside(CONTROL_WIDTH).GetMidVPadded(CONTROL_HEIGHT).GetHShifted(CONTROL_START_X + ((CONTROL_WIDTH + CONTROL_PADDING) * static_cast<float32>(i))).GetVShifted(CONTROL_START_Y - current_y),
+              DrumEnginePluginDropDownMenuControl::Function::MIXER_CHANNEL,
+              i
+            )
+          };
+          pGraphics->AttachControl(control);
+          _Controls.Emplace(control);
+
+          current_y += CONTROL_HEIGHT * 2.0f + CONTROL_PADDING;
+        }
+
+        //Add the text control
+        {
+          DrumEnginePluginTextControl *const RESTRICT control
+          {
+            new DrumEnginePluginTextControl
+            (
+              this,
+              bounds.GetCentredInside(CONTROL_WIDTH).GetMidVPadded(CONTROL_HEIGHT).GetHShifted(CONTROL_START_X + ((CONTROL_WIDTH + CONTROL_PADDING) * static_cast<float32>(i))).GetVShifted(CONTROL_START_Y - current_y),
+              DrumEnginePluginTextControl::Function::MIXER_CHANNEL,
+              i
+            )
+          };
+          pGraphics->AttachControl(control);
+          _Controls.Emplace(control);
+
+          current_y += CONTROL_HEIGHT * 2.0f + CONTROL_PADDING;
+        }
+      }
     }
   };
 #endif
@@ -536,12 +982,14 @@ DrumEnginePlugin::DrumEnginePlugin(const InstanceInfo& info)
 
   //Set up the "INFINITY" soundbank.
   //SetUpInfinitySoundBank(true, false);
+  //SetUpInfinitySoundBank(false, true);
 
   //Set up the "PANGAEA" soundbank.
   //SetUpPangaeaSoundBank(true, false);
 
   //Set up the "SINGULARITY" soundbank.
-  SetUpSingularitySoundBank(true, false);
+  //SetUpSingularitySoundBank(true, false);
+  //SetUpSingularitySoundBank(false, true);
 
   //PangaeaStuff("KICK", "KICK", "OVERHEAD", "OVERHEAD");
   //PangaeaStuff("SNARE", "SNARE", "BLUE MOUSE", "BLUE_MOUSE");
@@ -576,9 +1024,9 @@ DrumEnginePlugin::DrumEnginePlugin(const InstanceInfo& info)
   memset(&preset, 0, sizeof(DrumEnginePreset));
 
   preset._Name = "DEBUG";
-  preset._SoundBankName = "PANGAEA";
-  preset._MixerRouting._Routing[0] = 2;
-  preset._MixerRouting._Routing[1] = 3;
+  preset._SoundBankName = "SINGULARITY";
+  preset._MixerRouting._Routing[7] = 10;
+  preset._MixerRouting._Routing[8] = 12;
 
   _DrumEngine.ApplyPreset(preset);
 #endif
@@ -624,7 +1072,7 @@ void DrumEnginePlugin::ProcessBlock(sample **inputs, sample **outputs, int numbe
     {
       if ((FAKE_PLAYING_COUNTER % 44100) == 0)
       {
-        _DrumEngine.OnNoteOn(24, 127);
+        _DrumEngine.OnNoteOn(67, 127);
       }
 
       ++FAKE_PLAYING_COUNTER;
@@ -723,8 +1171,8 @@ int DrumEnginePlugin::UnserializeState(const iplug::IByteChunk &chunk, int start
 */
 void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const bool create_regions_and_midis) NOEXCEPT
 {
-  constexpr uint32 NUMBER_OF_VELOCITY_LAYERS{8};
-  constexpr uint32 NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER{8};
+  constexpr uint32 NUMBER_OF_VELOCITY_LAYERS{ 12 };
+  constexpr uint32 NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER{ 8 };
 
   DrumEngineSoundBankCreationParameters parameters;
 
@@ -739,23 +1187,91 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::STRONGEST;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation &new_microphone_information{ new_piece_information._MicrophoneInformations.Back() };
+
+        new_microphone_information._Name = "KICK";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
     parameters._PieceInformations.Emplace();
     DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "SNARE";
+    new_piece_information._Name = "SNARE_CENTER";
     new_piece_information._MIDINote = 26;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SNARE_CENTER";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "SNARE_RIMSHOT";
+    new_piece_information._MIDINote = 27;
+    new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
+    new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 4;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SNARE_RIMSHOT";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "SNARE_SIDE_STICK";
+    new_piece_information._MIDINote = 28;
+    new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
+    new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 4;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SNARE_SIDE_STICK";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -767,8 +1283,43 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 2;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_1";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "TOM_1_RIM_ONLY";
+    new_piece_information._MIDINote = 11;
+    new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
+    new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 2;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_1_RIM_ONLY";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -780,9 +1331,43 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 2;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_2";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "TOM_2_RIM_ONLY";
+    new_piece_information._MIDINote = 12;
+    new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
+    new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 2;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_2_RIM_ONLY";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -794,9 +1379,43 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 2;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_3";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "TOM_3_RIM_ONLY";
+    new_piece_information._MIDINote = 13;
+    new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
+    new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 2;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_3_RIM_ONLY";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -808,9 +1427,43 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 2;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_4";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "TOM_4_RIM_ONLY";
+    new_piece_information._MIDINote = 14;
+    new_piece_information._VelocityCurve = VelocityCurve::STRONGER;
+    new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 2;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "TOM_4_RIM_ONLY";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -822,9 +1475,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "CHINA";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -836,9 +1499,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIDE_BOW";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -850,9 +1523,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIDE_BELL";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -864,9 +1547,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIDE_CRASH";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -878,9 +1571,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIGHT_CRASH";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -892,9 +1595,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "STACK";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -906,9 +1619,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SPLASH";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -920,9 +1643,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "LEFT_CRASH";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -934,9 +1667,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 1;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_0";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -948,9 +1691,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 2;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_1";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -962,9 +1715,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 3;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_2";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -976,9 +1739,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 4;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_3";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -990,9 +1763,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 5;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_4";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -1004,9 +1787,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 6;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_5";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -1018,9 +1811,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 7;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_6";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -1032,9 +1835,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 8;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_LEVEL_7";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -1046,9 +1859,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_PEDAL";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -1060,9 +1883,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = true;
+    new_piece_information._HihatLevel = 9;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "HIHAT_SPLASH";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -1074,9 +1907,19 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = NUMBER_OF_VELOCITY_LAYERS;
     new_piece_information._NumberOfSamplesPerVelocityLayer = NUMBER_OF_SAMPLES_PER_VELOCITY_LAYER;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 4;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "WIDE_LEFT_CRASH";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "MAIN";
+    }
   }
 
   {
@@ -1108,7 +1951,8 @@ void DrumEnginePlugin::SetUpInfinitySoundBank(const bool create_soundbank, const
 */
 void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, const bool create_regions_and_midis) NOEXCEPT
 {
-  constexpr uint32 OVERHEAD_MIXER_CHANNEL_INDEX{ 11 };
+  constexpr float32 SNARE_PITCH{ 1.0f };
+  constexpr float32 CYMBALS_PAN{ 0.5f };
 
   DrumEngineSoundBankCreationParameters parameters;
 
@@ -1118,105 +1962,376 @@ void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, co
     parameters._PieceInformations.Emplace();
     DrumEngineSoundBankCreationPieceInformation &new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "KICK_D112";
+    new_piece_information._Name = "KICK";
     new_piece_information._MIDINote = 24;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 1;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 0;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "KICK_1";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "KICK 1";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "KICK_2";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "KICK 2";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "KICK_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "KICK_ROOM";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "KICK ROOM";
+    }
   }
 
   {
     parameters._PieceInformations.Emplace();
-    DrumEngineSoundBankCreationPieceInformation &new_piece_information{parameters._PieceInformations.Back()};
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "KICK_BETA_52";
-    new_piece_information._MIDINote = 24;
+    new_piece_information._Name = "SNARE";
+    new_piece_information._MIDINote = 26;
+    new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
+    new_piece_information._NumberOfVelocityLayers = 2;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 12;
+    new_piece_information._Pitch = SNARE_PITCH;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 1;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SNARE_TOP_1";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "SNARE TOP 1";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SNARE_TOP_2";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "SNARE TOP 2";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SNARE_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "SNARE_ROOM";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "SNARE ROOM";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "RACK TOM 1";
+    new_piece_information._MIDINote = 35;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 1;
-    new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 8;
+    new_piece_information._Pitch = 1.0f + (4.0f / 12.0f);
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 1;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RACK_TOM_1";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "RACK TOM 1";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RACK_TOM_1_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RACK_TOM_1_ROOM";
+        new_microphone_information._Pan = -0.25f;
+        new_microphone_information._MixerChannelName = "TOMS ROOM";
+    }
   }
 
   {
     parameters._PieceInformations.Emplace();
     DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "KICK_ROOM";
-    new_piece_information._MIDINote = 24;
+    new_piece_information._Name = "RACK TOM 2";
+    new_piece_information._MIDINote = 36;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 1;
-    new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 8;
+    new_piece_information._Pitch = 1.0f + (2.0f / 12.0f);
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 2;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RACK_TOM_2";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "RACK TOM 2";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RACK_TOM_2_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RACK_TOM_2_ROOM";
+        new_microphone_information._Pan = 0.25f;
+        new_microphone_information._MixerChannelName = "TOMS ROOM";
+    }
   }
 
   {
     parameters._PieceInformations.Emplace();
     DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "SNARE_SM57";
-    new_piece_information._MIDINote = 26;
+    new_piece_information._Name = "FLOOR TOM 1";
+    new_piece_information._MIDINote = 37;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
-    new_piece_information._NumberOfVelocityLayers = 2;
-    new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._NumberOfVelocityLayers = 1;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 8;
+    new_piece_information._Pitch = 1.0f + (0.0f / 12.0f);
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 3;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "FLOOR_TOM_1";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "FLOOR TOM 1";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "FLOOR_TOM_1_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "FLOOR_TOM_1_ROOM";
+        new_microphone_information._Pan = 0.5f;
+        new_microphone_information._MixerChannelName = "TOMS ROOM";
+    }
   }
 
   {
     parameters._PieceInformations.Emplace();
     DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "SNARE_MD421";
-    new_piece_information._MIDINote = 26;
+    new_piece_information._Name = "FLOOR TOM 2";
+    new_piece_information._MIDINote = 38;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
-    new_piece_information._NumberOfVelocityLayers = 2;
-    new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._NumberOfVelocityLayers = 1;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 8;
+    new_piece_information._Pitch = 1.0f + (-2.0f / 12.0f);
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 4;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "FLOOR_TOM_2";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "FLOOR TOM 2";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "FLOOR_TOM_2_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "FLOOR_TOM_2_ROOM";
+        new_microphone_information._Pan = -0.5f;
+        new_microphone_information._MixerChannelName = "TOMS ROOM";
+    }
   }
 
   {
     parameters._PieceInformations.Emplace();
     DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "SNARE_ROOM";
-    new_piece_information._MIDINote = 26;
+    new_piece_information._Name = "CHINA 1";
+    new_piece_information._MIDINote = 67;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
-    new_piece_information._NumberOfVelocityLayers = 2;
-    new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
-    new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 5;
+    new_piece_information._NumberOfVelocityLayers = 1;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 12;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 4;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "CHINA_1_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "CHINA_1_ROOM";
+        new_microphone_information._Pan = CYMBALS_PAN * (3.0f / 3.0f);
+        new_microphone_information._MixerChannelName = "CYMBALS ROOM";
+    }
   }
 
   {
     parameters._PieceInformations.Emplace();
     DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
 
-    new_piece_information._Name = "SNARE_OVERHEAD";
-    new_piece_information._MIDINote = 26;
+    new_piece_information._Name = "RIDE";
+    new_piece_information._MIDINote = 62;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
-    new_piece_information._NumberOfVelocityLayers = 2;
-    new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
-    new_piece_information._Length = 1;
-    new_piece_information._MixerChannelIndex = 6;
+    new_piece_information._NumberOfVelocityLayers = 1;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 12;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 4;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIDE_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIDE_ROOM";
+        new_microphone_information._Pan = CYMBALS_PAN * (2.0f / 3.0f);
+        new_microphone_information._MixerChannelName = "CYMBALS ROOM";
+    }
+  }
+
+  {
+    parameters._PieceInformations.Emplace();
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+
+    new_piece_information._Name = "RIGHT CRASH";
+    new_piece_information._MIDINote = 54;
+    new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
+    new_piece_information._NumberOfVelocityLayers = 1;
+    new_piece_information._NumberOfSamplesPerVelocityLayer = 10;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
+    new_piece_information._Length = 4;
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIGHT_CRASH_OVERHEAD";
+        new_microphone_information._Pan = 0.0f;
+        new_microphone_information._MixerChannelName = "OVERHEADS";
+    }
+
+    {
+        new_piece_information._MicrophoneInformations.Emplace();
+        DrumEngineSoundBankCreationMicrophoneInformation& new_microphone_information{new_piece_information._MicrophoneInformations.Back()};
+
+        new_microphone_information._Name = "RIGHT_CRASH_ROOM";
+        new_microphone_information._Pan = CYMBALS_PAN * (1.0f / 3.0f);
+        new_microphone_information._MixerChannelName = "CYMBALS ROOM";
+    }
   }
 
   {
     parameters._MixerChannels.Emplace();
     DrumEngineMixerChannel &new_mixer_channel{ parameters._MixerChannels.Back() };
 
-    new_mixer_channel._Name = "KICK D112";
+    new_mixer_channel._Name = "KICK 1";
     new_mixer_channel._IsStereo = false;
   }
 
@@ -1224,15 +2339,7 @@ void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, co
     parameters._MixerChannels.Emplace();
     DrumEngineMixerChannel &new_mixer_channel{ parameters._MixerChannels.Back() };
 
-    new_mixer_channel._Name = "KICK BETA 52";
-    new_mixer_channel._IsStereo = false;
-  }
-
-  {
-    parameters._MixerChannels.Emplace();
-    DrumEngineMixerChannel  new_mixer_channel{parameters._MixerChannels.Back()};
-
-    new_mixer_channel._Name = "KICK ROOM";
+    new_mixer_channel._Name = "KICK 2";
     new_mixer_channel._IsStereo = false;
   }
 
@@ -1240,7 +2347,7 @@ void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, co
     parameters._MixerChannels.Emplace();
     DrumEngineMixerChannel &new_mixer_channel{parameters._MixerChannels.Back()};
 
-    new_mixer_channel._Name = "SNARE SM57";
+    new_mixer_channel._Name = "SNARE TOP 1";
     new_mixer_channel._IsStereo = false;
   }
 
@@ -1248,15 +2355,39 @@ void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, co
     parameters._MixerChannels.Emplace();
     DrumEngineMixerChannel &new_mixer_channel{parameters._MixerChannels.Back()};
 
-    new_mixer_channel._Name = "SNARE MD421";
+    new_mixer_channel._Name = "SNARE TOP 2";
     new_mixer_channel._IsStereo = false;
   }
 
   {
     parameters._MixerChannels.Emplace();
-    DrumEngineMixerChannel &new_mixer_channel{parameters._MixerChannels.Back()};
+    DrumEngineMixerChannel& new_mixer_channel{parameters._MixerChannels.Back()};
 
-    new_mixer_channel._Name = "SNARE ROOM";
+    new_mixer_channel._Name = "RACK TOM 1";
+    new_mixer_channel._IsStereo = false;
+  }
+
+  {
+    parameters._MixerChannels.Emplace();
+    DrumEngineMixerChannel& new_mixer_channel{parameters._MixerChannels.Back()};
+
+    new_mixer_channel._Name = "RACK TOM 2";
+    new_mixer_channel._IsStereo = false;
+  }
+
+  {
+    parameters._MixerChannels.Emplace();
+    DrumEngineMixerChannel& new_mixer_channel{parameters._MixerChannels.Back()};
+
+    new_mixer_channel._Name = "FLOOR TOM 1";
+    new_mixer_channel._IsStereo = false;
+  }
+
+  {
+    parameters._MixerChannels.Emplace();
+    DrumEngineMixerChannel& new_mixer_channel{parameters._MixerChannels.Back()};
+
+    new_mixer_channel._Name = "FLOOR TOM 2";
     new_mixer_channel._IsStereo = false;
   }
 
@@ -1265,6 +2396,38 @@ void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, co
     DrumEngineMixerChannel &new_mixer_channel{parameters._MixerChannels.Back()};
 
     new_mixer_channel._Name = "OVERHEADS";
+    new_mixer_channel._IsStereo = true;
+  }
+
+  {
+    parameters._MixerChannels.Emplace();
+    DrumEngineMixerChannel &new_mixer_channel{parameters._MixerChannels.Back()};
+
+    new_mixer_channel._Name = "KICK ROOM";
+    new_mixer_channel._IsStereo = false;
+  }
+
+  {
+    parameters._MixerChannels.Emplace();
+    DrumEngineMixerChannel& new_mixer_channel{parameters._MixerChannels.Back()};
+
+    new_mixer_channel._Name = "SNARE ROOM";
+    new_mixer_channel._IsStereo = false;
+  }
+
+  {
+    parameters._MixerChannels.Emplace();
+    DrumEngineMixerChannel& new_mixer_channel{parameters._MixerChannels.Back()};
+
+    new_mixer_channel._Name = "TOMS ROOM";
+    new_mixer_channel._IsStereo = true;
+  }
+
+  {
+    parameters._MixerChannels.Emplace();
+    DrumEngineMixerChannel& new_mixer_channel{parameters._MixerChannels.Back()};
+
+    new_mixer_channel._Name = "CYMBALS ROOM";
     new_mixer_channel._IsStereo = true;
   }
 
@@ -1281,6 +2444,8 @@ void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, co
   if (create_regions_and_midis)
   {
     _DrumEngine.ExportRegionsAndMIDIForSoundBank(parameters, "Regions and MIDIs");
+
+    BREAKPOINT();
   }
 }
 
@@ -1289,7 +2454,8 @@ void DrumEnginePlugin::SetUpSingularitySoundBank(const bool create_soundbank, co
  */
 void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const bool create_regions_and_midis) NOEXCEPT
 {
-  constexpr float32 CYMBALS_PANNING{0.5f};
+  /*
+  constexpr float32 CYMBALS_Pan{0.5f};
   constexpr uint32 OVERHEAD_MIXER_CHANNEL_INDEX{11};
 
   DrumEngineSoundBankCreationParameters parameters;
@@ -1298,14 +2464,17 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
 
   {
     parameters._PieceInformations.Emplace();
-    DrumEngineSoundBankCreationPieceInformation& new_piece_information{parameters._PieceInformations.Back()};
+    DrumEngineSoundBankCreationPieceInformation& new_piece_information{ parameters._PieceInformations.Back() };
 
     new_piece_information._Name = "KICK_D112";
     new_piece_information._MIDINote = 24;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 5;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 0;
   }
@@ -1319,7 +2488,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 5;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 1;
   }
@@ -1333,7 +2505,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 5;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1347,7 +2522,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 6;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 2;
   }
@@ -1361,7 +2539,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 6;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 3;
   }
@@ -1375,7 +2556,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 6;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 4;
   }
@@ -1389,7 +2573,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 6;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1401,10 +2588,13 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._Name = "TOM_1_D112";
     new_piece_information._MIDINote = 35;
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 5;
   }
@@ -1418,7 +2608,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 6;
   }
@@ -1432,7 +2625,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1446,7 +2642,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 5;
   }
@@ -1460,7 +2659,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 7;
   }
@@ -1474,7 +2676,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1488,7 +2693,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 8;
   }
@@ -1502,7 +2710,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = 9;
   }
@@ -1516,7 +2727,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1530,7 +2744,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = CYMBALS_PANNING * (3.0f / 3.0f);
+    new_piece_information._Pan = CYMBALS_Pan * (3.0f / 3.0f);
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1544,8 +2761,11 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = CYMBALS_PANNING * (1.0f / 3.0f);
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = CYMBALS_Pan * (1.0f / 3.0f);
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1559,7 +2779,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = 0.0f;
+    new_piece_information._Pan = 0.0f;
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1573,7 +2796,10 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
     new_piece_information._VelocityCurve = VelocityCurve::LINEAR;
     new_piece_information._NumberOfVelocityLayers = 4;
     new_piece_information._NumberOfSamplesPerVelocityLayer = 16;
-    new_piece_information._Panning = -CYMBALS_PANNING * (1.0f / 3.0f);
+    new_piece_information._Pan = -CYMBALS_Pan * (1.0f / 3.0f);
+    new_piece_information._Pitch = 1.0f;
+    new_piece_information._IsHihat = false;
+    new_piece_information._HihatLevel = 0;
     new_piece_information._Length = 1;
     new_piece_information._MixerChannelIndex = OVERHEAD_MIXER_CHANNEL_INDEX;
   }
@@ -1688,4 +2914,5 @@ void DrumEnginePlugin::SetUpPangaeaSoundBank(const bool create_soundbank, const 
   {
     _DrumEngine.ExportRegionsAndMIDIForSoundBank(parameters, "Regions and MIDIs");
   }
+  */
 }

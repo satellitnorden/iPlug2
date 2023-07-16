@@ -54,7 +54,9 @@ public:
 private:
 
   //Friend declarations.
-  friend class DropDownMenu;
+  friend class DrumEnginePluginTextControl;
+  friend class DrumEnginePluginButtonControl;
+  friend class DrumEnginePluginDropDownMenuControl;
 
   //The midi queue.
   iplug::IMidiQueue _MidiQueue;
@@ -70,6 +72,9 @@ private:
 
   //Denotes if UI needs to be rebuilt.
   bool _RebuildUI{ false };
+
+  //The start mixer channel index.
+  uint32 _StartMixerChannelIndex{ 0 };
 
   /*
   * Sets up the "INFINITY" soundbank.
