@@ -320,6 +320,7 @@
     <ClInclude Include="..\..\..\IPlug\ISender.h" />
     <ClInclude Include="..\DrumEnginePlugin.h" />
     <ClInclude Include="..\resources\resource.h" />
+    <ClInclude Include="..\SamplesConform.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Catalyst-Engine\Engine\Source\Resources\Core\ResourcePointer.cpp" />

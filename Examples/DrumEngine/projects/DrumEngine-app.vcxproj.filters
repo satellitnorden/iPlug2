@@ -267,6 +267,7 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Shared-Code\DrumEngine\DrumEngine.h" />
     <ClInclude Include="..\DrumEnginePlugin.h" />
+    <ClInclude Include="..\SamplesConform.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="resources">
